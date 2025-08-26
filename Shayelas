@@ -1,0 +1,443 @@
+# create a new Vite React project
+npm create vite@latest study-beach -- --template react
+
+cd study-beach
+npm install
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import './index.css'          // Tailwind or your own CSS
+import StudyBeach from './StudyBeach'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode><StudyBeach /></React.StrictMode>
+)
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+module.exports = {
+  content: ["./index.html", "./src/**/*.{js,jsx}"],
+  theme: { extend: {} },
+  plugins: [],
+}
+npm install framer-motion reactflow react-markdown remark-gfm
+npm run dev
+# open the shown localhost:5173 URL and confirm the app runs
+git init
+git add .
+git commit -m "Initial site"
+# create a GitHub repo (on github.com) and push:
+git remote add origin <your-github-repo-url>
+git push -u origin main
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+/**
+ * Law Student Study Website — "The Summer I Turned Pretty" theme
+ * Single-file React component. Uses Tailwind classes for styling.
+ * Fully editable. Saves everything to localStorage.
+ * NEW: Assets panel to upload/set your two background images (sunset + hex pattern).
+ */
+
+const MODULES = [
+  { id: "criminal", name: "Criminal Law", color: "from-rose-200 to-rose-100" },
+  { id: "public", name: "Public Law", color: "from-sky-200 to-sky-100" },
+  { id: "contract", name: "Contract Law", color: "from-amber-200 to-amber-100" },
+  { id: "lsm", name: "Legal System & Method", color: "from-emerald-200 to-emerald-100" },
+];
+
+// ---------- tiny helpers ----------
+function useLocalStorage(key, initial) {
+  const [value, setValue] = useState(() => {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : initial; } catch { return initial; }
+  });
+  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }, [key, value]);
+  return [value, setValue];
+}
+
+function SectionTitle({ icon, children, right }) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2 text-xl font-semibold">{icon}{children}</div>
+      <div className="text-sm">{right}</div>
+    </div>
+  );
+}
+
+// ---------- Assets (your backgrounds) ----------
+function AssetsPanel({ hero, setHero }) {
+  const [assets, setAssets] = useLocalStorage("law.assets", { heroBg: hero.bg || "", pattern: hero.pattern || "" });
+
+  useEffect(() => { setHero(h => ({ ...h, bg: assets.heroBg || h.bg, pattern: assets.pattern || h.pattern })); }, []);
+
+  const onPick = (field) => (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      const next = { ...assets, [field]: dataUrl };
+      setAssets(next);
+      setHero(h => ({ ...h, [field === 'heroBg' ? 'bg' : 'pattern']: dataUrl }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clear = (field) => () => {
+    const next = { ...assets, [field]: "" };
+    setAssets(next);
+    setHero(h => ({ ...h, [field === 'heroBg' ? 'bg' : 'pattern']: "" }));
+  };
+
+  return (
+    <div className="rounded-2xl border p-4 bg-white/70 backdrop-blur shadow-sm">
+      <SectionTitle icon={<span>🏝️</span>} right={<span className="text-muted-foreground">optional</span>}>
+        Backgrounds & Patterns
+      </SectionTitle>
+      <div className="grid md:grid-cols-2 gap-4 mt-3">
+        <div className="space-y-2">
+          <div className="font-medium">Hero banner image (use your sunset)</div>
+          <input type="file" accept="image/*" onChange={onPick('heroBg')} />
+          {assets.heroBg && (
+            <div className="relative">
+              <img src={assets.heroBg} alt="Hero background" className="rounded-xl border" />
+              <div className="mt-2 flex gap-2">
+                <button className="px-3 py-1 rounded-lg bg-rose-200" onClick={()=>setHero(h=>({ ...h, bg: assets.heroBg }))}>Set as banner</button>
+                <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={clear('heroBg')}>Remove</button>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="space-y-2">
+          <div className="font-medium">Overlay pattern (use the mint hex pattern)</div>
+          <input type="file" accept="image/*" onChange={onPick('pattern')} />
+          {assets.pattern && (
+            <div className="relative">
+              <img src={assets.pattern} alt="Pattern" className="rounded-xl border" />
+              <div className="mt-2 flex gap-2">
+                <button className="px-3 py-1 rounded-lg bg-sky-200" onClick={()=>setHero(h=>({ ...h, pattern: assets.pattern }))}>Set as overlay</button>
+                <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={clear('pattern')}>Remove</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <p className="text-sm text-muted-foreground mt-3">Tip: Upload the two photos you just shared — they'll be saved locally and applied instantly.</p>
+    </div>
+  );
+}
+
+// ---------- Notes ----------
+function Notes({ storageKey }) {
+  const [text, setText] = useLocalStorage(storageKey, `# Quick notes\n\nUse **Markdown** for headings, lists, and tables.\n\n| Element | Rule | Case |\n|---|---|---|\n| Mens rea | Virtual certainty | R v Woollin |`);
+  return (
+    <div className="grid md:grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <div className="text-sm font-medium">Markdown editor</div>
+        <textarea className="min-h[320px] min-h-[320px] w-full p-3 border rounded-xl" value={text} onChange={(e)=>setText(e.target.value)} />
+      </div>
+      <div className="space-y-2">
+        <div className="text-sm font-medium">Preview</div>
+        <div className="prose max-w-none bg-white rounded-xl p-4 border shadow-sm whitespace-pre-wrap">{text}</div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Flashcards ----------
+function Flashcards({ storageKey }) {
+  const [cards, setCards] = useLocalStorage(storageKey, [
+    { q: "Define mens rea", a: "The mental element of a crime; the defendant's state of mind." },
+    { q: "What is consideration?", a: "Something of value exchanged to form a binding contract." },
+  ]);
+  const [mode, setMode] = useState("edit");
+  const [i, setI] = useState(0);
+  const [show, setShow] = useState(false);
+  const add = () => setCards([...cards, { q: "", a: "" }]);
+  const del = (idx) => setCards(cards.filter((_, j)=>j!==idx));
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-3">
+        <button className={`px-3 py-1 rounded-lg ${mode==='edit'?'bg-rose-300':'bg-neutral-200'}`} onClick={()=>setMode('edit')}>Edit</button>
+        <button className={`px-3 py-1 rounded-lg ${mode==='study'?'bg-rose-300':'bg-neutral-200'}`} onClick={()=>setMode('study')}>Study</button>
+        <div className="ml-auto text-sm text-muted-foreground">{cards.length} cards</div>
+      </div>
+      {mode==='edit' ? (
+        <div className="space-y-3">
+          {cards.map((c, idx)=> (
+            <div key={idx} className="rounded-xl border p-3 bg-white">
+              <div className="grid md:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-sm font-medium">Question</div>
+                  <textarea className="w-full p-2 border rounded-lg" value={c.q} onChange={(e)=>{ const copy=[...cards]; copy[idx].q=e.target.value; setCards(copy); }} />
+                </div>
+                <div>
+                  <div className="text-sm font-medium">Answer</div>
+                  <textarea className="w-full p-2 border rounded-lg" value={c.a} onChange={(e)=>{ const copy=[...cards]; copy[idx].a=e.target.value; setCards(copy); }} />
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <button className="text-sm px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>del(idx)}>Delete</button>
+              </div>
+            </div>
+          ))}
+          <button className="px-3 py-1 rounded-lg bg-rose-200" onClick={add}>Add card</button>
+        </div>
+      ) : (
+        <div className="max-w-xl mx-auto">
+          {cards.length===0 ? <p className="text-center text-muted-foreground">No cards yet</p> : (
+            <div className="rounded-2xl border bg-white p-6 text-center shadow">
+              <div className="text-sm mb-2">Flashcard {i+1} / {cards.length}</div>
+              <AnimatePresence mode="wait">
+                <motion.div key={show?`a-${i}`:`q-${i}`} initial={{ opacity: 0, rotateY: 90 }} animate={{ opacity:1, rotateY:0 }} exit={{ opacity:0, rotateY:-90 }} transition={{ duration: .25 }} className="text-xl min-h-[100px] flex items-center justify-center">
+                  {show ? cards[i].a : cards[i].q}
+                </motion.div>
+              </AnimatePresence>
+              <div className="flex justify-center gap-2 mt-3">
+                <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>setShow(s=>!s)}>{show?"Show question":"Show answer"}</button>
+              </div>
+              <div className="flex justify-between mt-2">
+                <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>{ setShow(false); setI((i-1+cards.length)%cards.length); }}>Prev</button>
+                <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>{ setShow(false); setI((i+1)%cards.length); }}>Next</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Quiz Builder ----------
+function Quizzes({ storageKey }) {
+  const [qs, setQs] = useLocalStorage(storageKey, [
+    { prompt: "Which case established the neighbour principle?", options: ["Carlill v Carbolic Smoke Ball", "Donoghue v Stevenson", "R v Brown", "Entores v Miles"], answer: 1 },
+  ]);
+  const [taking, setTaking] = useState(false);
+  const [answers, setAnswers] = useState({});
+  const [score, setScore] = useState(null);
+  const addQ = () => setQs([...qs, { prompt: "", options: ["", "", "", ""], answer: 0 }]);
+  const delQ = (i) => setQs(qs.filter((_, idx)=> idx!==i));
+  const submit = () => { let s=0; qs.forEach((q, i)=>{ if(answers[i]===q.answer) s++; }); setScore(s); };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <button className={`px-3 py-1 rounded-lg ${!taking?'bg-rose-300':'bg-neutral-200'}`} onClick={()=>setTaking(false)}>Build</button>
+        <button className={`px-3 py-1 rounded-lg ${taking?'bg-rose-300':'bg-neutral-200'}`} onClick={()=>{ setTaking(true); setScore(null); }}>Take quiz</button>
+        <div className="ml-auto text-sm text-muted-foreground">{qs.length} questions</div>
+      </div>
+
+      {!taking ? (
+        <div className="space-y-3">
+          {qs.map((q, i)=> (
+            <div key={i} className="rounded-xl border p-3 bg-white space-y-2">
+              <input className="w-full p-2 border rounded-lg" value={q.prompt} onChange={(e)=>{ const copy=[...qs]; copy[i].prompt=e.target.value; setQs(copy); }} placeholder="Question"/>
+              {q.options.map((opt, j)=> (
+                <div key={j} className="flex items-center gap-2">
+                  <input className="flex-1 p-2 border rounded-lg" value={opt} onChange={(e)=>{ const copy=[...qs]; copy[i].options[j]=e.target.value; setQs(copy); }} placeholder={`Option ${j+1}`}/>
+                  <label className="text-sm flex items-center gap-1"><input type="radio" name={`ans-${i}`} checked={q.answer===j} onChange={()=>{ const copy=[...qs]; copy[i].answer=j; setQs(copy); }}/> correct</label>
+                </div>
+              ))}
+              <div className="flex justify-between pt-1">
+                <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>{ const copy=[...qs]; copy[i].options.push(""); setQs(copy); }}>Add option</button>
+                <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>delQ(i)}>Delete</button>
+              </div>
+            </div>
+          ))}
+          <button className="px-3 py-1 rounded-lg bg-rose-200" onClick={addQ}>Add question</button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {qs.map((q, i)=> (
+            <div key={i} className="rounded-xl border p-3 bg-white">
+              <div className="font-medium mb-2">{q.prompt}</div>
+              <div className="grid gap-2">
+                {q.options.map((opt, j)=> (
+                  <label key={j} className={`flex items-center gap-2 p-2 border rounded-lg ${answers[i]===j? 'bg-rose-50': ''}`}>
+                    <input type="radio" name={`take-${i}`} checked={answers[i]===j} onChange={()=>setAnswers(a=>({ ...a, [i]: j }))}/> {opt}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+          <button className="px-3 py-2 rounded-lg bg-rose-300" onClick={submit}>Submit</button>
+          {score!==null && <div className="text-lg">Score: {score} / {qs.length}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Mind Map (simple) ----------
+function MindMap({ storageKey }) {
+  const [nodes, setNodes] = useLocalStorage(storageKey, [
+    { id: 1, text: "Topic", x: 120, y: 60 },
+    { id: 2, text: "Case", x: 40, y: 180 },
+  ]);
+  const [drag, setDrag] = useState(null);
+
+  return (
+    <div className="rounded-2xl border bg-white overflow-hidden">
+      <div className="p-2 flex gap-2">
+        <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>setNodes([...nodes, { id: Date.now(), text: "New", x: 40, y: 40 }])}>Add node</button>
+        <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>setNodes([])}>Clear</button>
+      </div>
+      <div className="relative h-[360px] bg-[radial-gradient(circle_at_center,rgba(255,255,255,.9),rgba(255,255,255,.8))]">
+        {nodes.map(n=> (
+          <div key={n.id}
+               className="absolute select-none cursor-move px-3 py-2 rounded-xl border shadow bg-rose-50"
+               style={{ left: n.x, top: n.y }}
+               onMouseDown={(e)=>setDrag({ id:n.id, dx:e.clientX-n.x, dy:e.clientY-n.y })}
+               onDoubleClick={()=>{
+                 const t = prompt('Edit text', n.text) || n.text;
+                 setNodes(nodes.map(x=> x.id===n.id? { ...x, text: t }: x));
+               }}>
+            {n.text}
+          </div>
+        ))}
+        <div onMouseMove={(e)=>{
+          if(!drag) return;
+          setNodes(ns => ns.map(n => n.id===drag.id ? { ...n, x: e.clientX-drag.dx, y: e.clientY-drag.dy } : n));
+        }} onMouseUp={()=>setDrag(null)} className="absolute inset-0"/>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Tables / Diagrams ----------
+function TableBuilder({ storageKey }) {
+  const [rows, setRows] = useLocalStorage(storageKey, [["Principle","Case","Ratio"],["Mens rea","Woollin","Virtual certainty"]]);
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>setRows([...rows, Array(rows[0]?.length||3).fill("")])}>Add row</button>
+        <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>setRows(rows.map(r=>[...r,""]))}>Add column</button>
+        <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>setRows(rows.slice(0,-1))}>Remove row</button>
+      </div>
+      <div className="overflow-auto">
+        <table className="min-w-[500px] w-full border rounded-xl overflow-hidden">
+          <tbody>
+            {rows.map((r, i)=> (
+              <tr key={i} className="even:bg-rose-50/40">
+                {r.map((cell, j)=> (
+                  <td key={j} className="border p-2">
+                    <input className="w-full outline-none" value={cell} onChange={(e)=>{ const copy=[...rows]; copy[i][j]=e.target.value; setRows(copy); }}/>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Study materials ----------
+function Materials({ storageKey }) {
+  const [items, setItems] = useLocalStorage(storageKey, [
+    { type: 'link', label: 'Lecture notes template', url: 'https://example.com' },
+  ]);
+  const add = () => setItems([...items, { type: 'link', label: '', url: '' }]);
+  const del = (i) => setItems(items.filter((_, idx)=> idx!==i));
+  return (
+    <div className="space-y-3">
+      {items.map((it, i)=> (
+        <div key={i} className="grid md:grid-cols-[1fr,2fr,auto] gap-2 items-center">
+          <select className="p-2 border rounded-lg" value={it.type} onChange={(e)=>{ const copy=[...items]; copy[i].type=e.target.value; setItems(copy); }}>
+            <option value="link">Link</option>
+            <option value="file">File (describe)</option>
+          </select>
+          <input className="p-2 border rounded-lg" placeholder={it.type==='link'? 'Title' : 'File description'} value={it.label} onChange={(e)=>{ const copy=[...items]; copy[i].label=e.target.value; setItems(copy); }} />
+          <input className="p-2 border rounded-lg" placeholder={it.type==='link'? 'https://…' : 'optional URL'} value={it.url} onChange={(e)=>{ const copy=[...items]; copy[i].url=e.target.value; setItems(copy); }} />
+          <button className="px-3 py-1 rounded-lg bg-neutral-200" onClick={()=>del(i)}>Delete</button>
+        </div>
+      ))}
+      <button className="px-3 py-1 rounded-lg bg-rose-200" onClick={add}>Add item</button>
+    </div>
+  );
+}
+
+// ---------- Module wrapper ----------
+function Module({ id, name }) {
+  return (
+    <div id={id} className="space-y-6">
+      <h2 className="text-2xl font-bold">{name}</h2>
+      <div className="grid gap-6">
+        <div>
+          <h3 className="text-lg font-semibold">Short Notes</h3>
+          <Notes storageKey={`law.${id}.notes`} />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold">Flashcards</h3>
+          <Flashcards storageKey={`law.${id}.cards`} />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold">Quizzes</h3>
+          <Quizzes storageKey={`law.${id}.quiz`} />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold">Mind Map</h3>
+          <MindMap storageKey={`law.${id}.mind`} />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold">Tables / Diagrams</h3>
+          <TableBuilder storageKey={`law.${id}.table`} />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold">Study Materials</h3>
+          <Materials storageKey={`law.${id}.materials`} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Main component ----------
+export default function StudyBeach() {
+  const [hero, setHero] = useLocalStorage("law.hero", { title: "The Summer I Studied Law ✨", emoji: "", bg: "", pattern: "" });
+
+  return (
+    <div className="p-6 md:p-10 space-y-10" style={{
+      backgroundImage: hero.bg ? `url(${hero.bg})` : undefined,
+      backgroundSize: 'cover', backgroundPosition: 'center'
+    }}>
+      <div className="relative overflow-hidden rounded-3xl border shadow-lg bg-white/70 backdrop-blur">
+        <div className="p-6 md:p-10 relative">
+          <div className="flex items-center gap-3 mb-3">
+            <span>🌞</span>
+            <span className="px-2 py-1 rounded-lg bg-rose-200 text-rose-900 text-sm">summer study</span>
+          </div>
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
+            {hero.title} {hero.emoji}
+          </h1>
+          <p className="text-muted-foreground mt-3 max-w-2xl">
+            A cozy, beachy workspace for Criminal Law, Public Law, Contract Law, and Legal System & Method.
+          </p>
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {MODULES.map(m => (
+              <a key={m.id} href={`#${m.id}`} className={`rounded-2xl p-3 text-sm font-medium shadow hover:shadow-md transition bg-gradient-to-br ${m.color}`}>
+                {m.name}
+              </a>
+            ))}
+          </div>
+        </div>
+        {hero.pattern && (
+          <div className="absolute inset-0 pointer-events-none opacity-25" style={{ backgroundImage: `url(${hero.pattern})`, backgroundSize: '600px', mixBlendMode: 'overlay' }} />
+        )}
+      </div>
+
+      <AssetsPanel hero={hero} setHero={setHero} />
+
+      <div className="grid gap-12">
+        {MODULES.map(m => (<Module key={m.id} id={m.id} name={m.name} />))}
+      </div>
+
+      <footer className="text-center text-sm text-muted-foreground pt-8">Saved locally • Make it yours ✨</footer>
+    </div>
+  );
+}
+
